@@ -4,7 +4,6 @@
  *  Created on: 25 ott 2021
  *      Author: simoc
  */
-
 #if defined WIN32
 #include <winsock.h>
 #else
@@ -16,24 +15,18 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-// for atoi()
-#define PROTOPORT 27015 // default protocol port number
-#define QLEN 6 // size of request queue
+#include "protocol.h"
+#define QLEN 5 // size of request queue
 
-struct message{
-	char operation;
-	int first;
-	int second;
-	float result;
-	int error;
-};
-
-void print_messagge(struct message* mess){
-	printf("Operation: %c\n", mess->operation);
-	printf("First: %d\n", mess->first);
-	printf("Second: %d\n", mess->second);
+void errorhandler(char *errorMessage) {
+	printf ("%s", errorMessage);
 }
 
+void clearwinsock() {
+	#if defined WIN32
+	WSACleanup();
+	#endif
+}
 
 int mult(int first, int second){
 	return (first*second);
@@ -49,7 +42,7 @@ int sub(int first, int second){
 
 //Da vedereee
 float division(int first, int second){
-	return (float)(first/second);
+	return ((float)first/(float)second);
 }
 
 void operation(struct message* mess){
@@ -72,18 +65,8 @@ void operation(struct message* mess){
 		}
 		else  mess->result = division(mess->first, mess->second);
 	}
-}
 
-void errorhandler(char *errorMessage) {
-	printf ("%s", errorMessage);
 }
-
-void clearwinsock() {
-	#if defined WIN32
-	WSACleanup();
-	#endif
-}
-
 
 int main(int argc, char *argv[]) {
 	int port;
@@ -106,7 +89,7 @@ int main(int argc, char *argv[]) {
 	}
 	#endif
 
-	// CREAZIONE DELLA SOCKET
+	//Creation of the socket
 	int my_socket;
 	my_socket = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
 	if (my_socket < 0) {
@@ -115,7 +98,7 @@ int main(int argc, char *argv[]) {
 		return -1;
 	}
 
-	// ASSEGNAZIONE DI UN INDIRIZZO ALLA SOCKET
+	//Giving an address to socket
 	struct sockaddr_in sad;
 	memset(&sad, 0, sizeof(sad)); // ensures that extra bytes contain 0
 	sad.sin_family = AF_INET;
@@ -130,7 +113,7 @@ int main(int argc, char *argv[]) {
 		return -1;
 	}
 
-	// SETTAGGIO DELLA SOCKET ALL'ASCOLTO
+	//Setting socket to listen
 	if (listen (my_socket, QLEN) < 0) {
 		errorhandler("listen() failed.\n");
 		closesocket(my_socket);
@@ -138,7 +121,7 @@ int main(int argc, char *argv[]) {
 		return -1;
 	}
 
-	// ACCETTARE UNA NUOVA CONNESSIONE
+	//Accepting  new connection
 	struct sockaddr_in cad; // structure for the client address
 	int client_socket; // socket descriptor for the client
 	int client_len; // the size of the client address
@@ -157,30 +140,40 @@ int main(int argc, char *argv[]) {
 		printf("%u", cad.sin_port);
 		printf("\n");
 
-		//Receving the message from the Client
-		int bytesRcvd;
-		struct message mess;
-		if ((bytesRcvd = recv(client_socket, &mess, sizeof(mess), 0)) <= 0) {
-			errorhandler("recv() failed or connection closed prematurely");
-			closesocket(client_socket);
-			clearwinsock();
-			return -1;
-		}
+		while(1){
+			int bytesRcvd;
+			struct message mess;
 
-		//Computing the result...
-		operation(&mess);
-		printf("I'm computing...\n");
-		//Sending answer to Client
-		if (send(client_socket, &mess, sizeof(mess), 0) != sizeof(mess)) {
-			errorhandler("send() sent a different number of bytes thanexpected");
-			closesocket(client_socket);
-			clearwinsock();
-			return -1;
+			//Receving the message from Client
+			if ((bytesRcvd = recv(client_socket, &mess, sizeof(mess), 0)) <= 0) {
+				errorhandler("recv() failed or connection closed prematurely");
+				closesocket(client_socket);
+				clearwinsock();
+				return -1;
+			}
+			printf("Received. \n");
+
+			//If Client want to close connection..
+			if(mess.operation == '=')
+				break;
+
+			//Computing the result...
+			operation(&mess);
+			printf("I'm computing...\n");
+
+			//Sending answer to Client
+			if (send(client_socket, &mess, sizeof(mess), 0) != sizeof(mess)) {
+				errorhandler("send() sent a different number of bytes thanexpected");
+				closesocket(client_socket);
+				clearwinsock();
+				return -1;
+			}
+			printf("Answer sent.\n");
+
 		}
-		printf("Answer sent.\n");
 
 		closesocket(client_socket);
-		printf("Chiusura connessione...\n");
+		printf("Connection closed.\n");
 	} // end-while
 	return(0);
 } // end-main
