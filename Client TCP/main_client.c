@@ -17,7 +17,6 @@
 #include <stdlib.h>
 #include <string.h>
 #define BUFFERSIZE 512
-#define PROTOPORT 27015 // Numero di porta di default
 
 struct message{
 	char operation;
@@ -48,13 +47,26 @@ void convert_message(char* str, struct message* mess){
 	mess->operation = uno[0];
 	mess->first = atoi(due);
 	mess->second = atoi(tre);
+	mess->result = 0;
+	mess->error = 0;
 
+}
+
+void close_message(struct message* mess){
+
+	mess->operation = '=';
+	mess->first = 0;
+	mess->second = 0;
+	mess->result = 0;
+	mess->error = 0;
 }
 
 void print_message(struct message* mess){
 	printf("Operation: %c\n", mess->operation);
 	printf("First: %d\n", mess->first);
 	printf("Second: %d\n", mess->second);
+	printf("Result: %.2f\n", mess->result);
+	printf("Error: %d\n", mess->error);
 }
 
 void errorhandler(char *error_message) {
@@ -82,11 +94,19 @@ int main(void) {
 	char* serverAddress;
 	printf("Insert address of the Server:\n");
 	scanf("%s", serverAddress);
+	fflush(stdin);
+
+	if(!strcmp(serverAddress, "127.0.0.1") == 0)
+		strcpy(serverAddress, "127.0.0.1");
 
 	//Asking user to insert Port number port
 	int serverPort;
 	printf("Insert port of the Server:\n");
 	scanf("%d", &serverPort);
+	fflush(stdin);
+
+	if(serverPort != 27015)
+		serverPort = 27015;
 
 	//Creating Socket
 	int c_socket;
@@ -115,48 +135,56 @@ int main(void) {
 	}
 
 	//Asking the user to insert a message in the form (+ Integer Integer)
-    struct message mess;
+	while(1){
+		struct message mess;
+		char str[25];
+		int i;
+		printf("Insert message in the form (+ Integer Integer): \n");
+		fgets(str, sizeof(str), stdin);
+		fflush(stdin);
 
-    //Sono costretto a provare
-    mess.operation = '/';
-    mess.first = 27;
-    mess.second = 15;
-    mess.result = 0;
-    mess.error = 0;
-    //char str[25];
-	//printf("Insert the messagge (ex: + 25 24): \n");
-	//fgets(str, 25, stdin);
+		i = strlen(str) - 1;
+		if (str[i] == '\n')
+		    str[i] = '\0';
 
+		if(strcmp(str, "=") == 0){
+			close_message(&mess);
+			//Sending message to Server
+			if (send(c_socket, &mess, sizeof(mess), 0) != sizeof(mess)) {
+				errorhandler("send() sent a different number of bytes thanexpected");
+				closesocket(c_socket);
+				clearwinsock();
+				return -1;
+			}
+			break;
+		}
 
-	//Converting the string into a message for the Server
-	//convert_message(str, &mess);
-	//print_message(&mess);
+		//Converting the string into a message for the Server
+		convert_message(str, &mess);
 
+		//Sending message to Server
+		if (send(c_socket, &mess, sizeof(mess), 0) != sizeof(mess)) {
+			errorhandler("send() sent a different number of bytes thanexpected");
+			closesocket(c_socket);
+			clearwinsock();
+			return -1;
+		}
 
-	//Sending message to Server
-	if (send(c_socket, &mess, sizeof(mess), 0) != sizeof(mess)) {
-		errorhandler("send() sent a different number of bytes thanexpected");
-		closesocket(c_socket);
-		clearwinsock();
-		return -1;
+		//Receiving the answer for the operation..
+		if ((recv(c_socket, &mess, sizeof(mess), 0)) <= 0) {
+			errorhandler("recv() failed or connection closed prematurely");
+			closesocket(c_socket);
+			clearwinsock();
+			return -1;
+		}
+
+		if(mess.error == 0)
+			printf("The result is: %.2f\n", mess.result);
+		else printf("The result is: error\n");
 	}
-
-	//Receiving the answer for the operation..
-	if ((recv(c_socket, &mess, sizeof(mess), 0)) <= 0) {
-		errorhandler("recv() failed or connection closed prematurely");
-		closesocket(c_socket);
-		clearwinsock();
-		return -1;
-	}
-
-	if(mess.error == 0)
-		printf("The result is: %f\n", mess.result);
-	else printf("The result is: error");
-
 
 	closesocket(c_socket);
 	clearwinsock();
-
 
 	system("pause");
 	return(0);
