@@ -22,7 +22,7 @@ void print_message(struct message* mess){
 	printf("Operation: %c\n", mess->operation);
 	printf("First: %d\n", mess->first);
 	printf("Second: %d\n", mess->second);
-	printf("Result: %2.f\n", mess->result);
+	printf("Result: %.2f\n", mess->result);
 	printf("Error: %d\n", mess->error);
 }
 
