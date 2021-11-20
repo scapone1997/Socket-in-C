@@ -19,12 +19,12 @@
 #include "protocol.h"
 #define BUFFERSIZE 512
 
-void insert_string(char* str){
+void insert_string(char* str, int length){
 
 	int number = 1;
 	while(number == 1){
-		printf("Insert message in the form (+ Integer Integer): \n");
-		fgets(str, sizeof(str), stdin);
+		printf("Insert message in the form [Operation Integer Integer]: \n");
+		fgets(str, length, stdin);
 		fflush(stdin);
 
 		int count = 0;
@@ -141,13 +141,13 @@ int main(int argc, char* argv[]) {
 		return -1;
 	}
 
-	//Asking the user to insert a message in the form (+ Integer Integer)
+	//We manage client requests by forwarding them to server..
 	while(1){
 		struct message mess;
 		char str[25];
-		int i;
 
-		insert_string(str);
+		//Asking user to insert a string in the form (Operation Integer Integer)..
+		insert_string(str, 25);
 
 		if(str[0] == '='){
 			close_message(&mess);
