@@ -16,16 +16,35 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "protocol.h"
 #define BUFFERSIZE 512
 
-struct message{
-	char operation;
-	int first;
-	int second;
-	float result;
-	int error;
-};
+void insert_string(char* str){
 
+	int number = 1;
+	while(number == 1){
+		printf("Insert message in the form (+ Integer Integer): \n");
+		fgets(str, sizeof(str), stdin);
+		fflush(stdin);
+
+		int count = 0;
+		if(str[0] == '+' || str[0] == '-' || str[0] == 'x' || str[0] == '/'){
+			for(int k = 0; str[k] != '\0'; k++){
+				if(str[k] ==  ' ')
+					count++;
+			}
+			if(count == 2)
+				number = 0;
+		}
+		else if(str[0] == '='){
+			number = 2;
+		}
+		if(number == 1)
+			printf("Wrong format. Please try again.\n");
+
+	}
+
+}
 
 void convert_message(char* str, struct message* mess){
 
@@ -61,14 +80,6 @@ void close_message(struct message* mess){
 	mess->error = 0;
 }
 
-void print_message(struct message* mess){
-	printf("Operation: %c\n", mess->operation);
-	printf("First: %d\n", mess->first);
-	printf("Second: %d\n", mess->second);
-	printf("Result: %.2f\n", mess->result);
-	printf("Error: %d\n", mess->error);
-}
-
 void errorhandler(char *error_message) {
 	printf("%s",error_message);
 }
@@ -80,7 +91,7 @@ void clearwinsock() {
 }
 
 
-int main(void) {
+int main(int argc, char* argv[]) {
 	#if defined WIN32
 	WSADATA wsa_data;
 	int result = WSAStartup(MAKEWORD(2 ,2), &wsa_data);
@@ -90,23 +101,19 @@ int main(void) {
 	}
 	#endif
 
-	//Asking user to insert Serve number port
+
 	char* serverAddress;
-	printf("Insert address of the Server:\n");
-	scanf("%s", serverAddress);
-	fflush(stdin);
-
-	if(!strcmp(serverAddress, "127.0.0.1") == 0)
-		strcpy(serverAddress, "127.0.0.1");
-
-	//Asking user to insert Port number port
 	int serverPort;
-	printf("Insert port of the Server:\n");
-	scanf("%d", &serverPort);
-	fflush(stdin);
 
-	if(serverPort != 27015)
-		serverPort = 27015;
+	if(argc > 1){
+		strcpy(serverAddress, argv[1]);
+		serverPort = atoi(argv[2]);
+	}
+	else
+	{
+		strcpy(serverAddress, "127.0.0.1");
+		serverPort = PROTOPORT;
+	}
 
 	//Creating Socket
 	int c_socket;
@@ -139,18 +146,13 @@ int main(void) {
 		struct message mess;
 		char str[25];
 		int i;
-		printf("Insert message in the form (+ Integer Integer): \n");
-		fgets(str, sizeof(str), stdin);
-		fflush(stdin);
 
-		i = strlen(str) - 1;
-		if (str[i] == '\n')
-		    str[i] = '\0';
+		insert_string(str);
 
-		if(strcmp(str, "=") == 0){
+		if(str[0] == '='){
 			close_message(&mess);
 			//Sending message to Server
-			if (send(c_socket, &mess, sizeof(mess), 0) != sizeof(mess)) {
+			if (send(c_socket, (char*)&mess, sizeof(mess), 0) != sizeof(mess)) {
 				errorhandler("send() sent a different number of bytes thanexpected");
 				closesocket(c_socket);
 				clearwinsock();
@@ -163,7 +165,7 @@ int main(void) {
 		convert_message(str, &mess);
 
 		//Sending message to Server
-		if (send(c_socket, &mess, sizeof(mess), 0) != sizeof(mess)) {
+		if (send(c_socket, (char*)&mess, sizeof(mess), 0) != sizeof(mess)) {
 			errorhandler("send() sent a different number of bytes thanexpected");
 			closesocket(c_socket);
 			clearwinsock();
@@ -171,13 +173,14 @@ int main(void) {
 		}
 
 		//Receiving the answer for the operation..
-		if ((recv(c_socket, &mess, sizeof(mess), 0)) <= 0) {
+		if ((recv(c_socket, (char*)&mess, sizeof(mess), 0)) <= 0) {
 			errorhandler("recv() failed or connection closed prematurely");
 			closesocket(c_socket);
 			clearwinsock();
 			return -1;
 		}
 
+		//Checking if result contains error...
 		if(mess.error == 0)
 			printf("The result is: %.2f\n", mess.result);
 		else printf("The result is: error\n");

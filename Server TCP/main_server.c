@@ -40,7 +40,6 @@ int sub(int first, int second){
 	return (first - second);
 }
 
-//Da vedereee
 float division(int first, int second){
 	return ((float)first/(float)second);
 }
@@ -68,17 +67,8 @@ void operation(struct message* mess){
 
 }
 
-int main(int argc, char *argv[]) {
-	int port;
-	if (argc > 1) {
-		port = atoi(argv[1]); // if argument specified convert argument to binary
-	}
-	else
-		port = PROTOPORT; // use default port number
-	if (port < 0) {
-		printf("bad port number %s \n", argv[1]);
-		return 0;
-	}
+int main() {
+
 	#if defined WIN32 // initialize Winsock
 
 	WSADATA wsa_data;
@@ -103,7 +93,7 @@ int main(int argc, char *argv[]) {
 	memset(&sad, 0, sizeof(sad)); // ensures that extra bytes contain 0
 	sad.sin_family = AF_INET;
 	sad.sin_addr.s_addr = inet_addr("127.0.0.1");
-	sad.sin_port = htons(port); /* converts values between the host and
+	sad.sin_port = htons(PROTOPORT); /* converts values between the host and
 	network byte order. Specifically, htons() converts 16-bit quantities
 	from host byte order to network byte order. */
 	if (bind(my_socket, (struct sockaddr*) &sad, sizeof(sad)) < 0) {
@@ -145,13 +135,14 @@ int main(int argc, char *argv[]) {
 			struct message mess;
 
 			//Receving the message from Client
-			if ((bytesRcvd = recv(client_socket, &mess, sizeof(mess), 0)) <= 0) {
+			if ((bytesRcvd = recv(client_socket, (char*)&mess, sizeof(mess), 0)) <= 0) {
 				errorhandler("recv() failed or connection closed prematurely");
 				closesocket(client_socket);
 				clearwinsock();
 				return -1;
 			}
 			printf("Received. \n");
+
 
 			//If Client want to close connection..
 			if(mess.operation == '=')
@@ -162,14 +153,13 @@ int main(int argc, char *argv[]) {
 			printf("I'm computing...\n");
 
 			//Sending answer to Client
-			if (send(client_socket, &mess, sizeof(mess), 0) != sizeof(mess)) {
+			if (send(client_socket, (char*)&mess, sizeof(mess), 0) != sizeof(mess)) {
 				errorhandler("send() sent a different number of bytes thanexpected");
 				closesocket(client_socket);
 				clearwinsock();
 				return -1;
 			}
 			printf("Answer sent.\n");
-
 		}
 
 		closesocket(client_socket);
