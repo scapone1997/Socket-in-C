@@ -2,7 +2,7 @@
  * protocol.h
  *
  *  Created on: 15 nov 2021
- *      Author: simoc
+ *      Author: Simone Capone
  */
 
 #ifndef PROTOCOL_H_

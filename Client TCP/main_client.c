@@ -2,7 +2,7 @@
  * CLIENT TCP
  *
  *  Created on: 25 ott 2021
- *      Author: simoc
+ *      Author: Simone Capone
  */
 
 #if defined WIN32
@@ -19,11 +19,11 @@
 #include "protocol.h"
 #define BUFFERSIZE 512
 
+//Asking user to insert a string
 void insert_string(char* str, int length){
-
 	int number = 1;
 	while(number == 1){
-		printf("Insert message in the form [Operation Integer Integer]: \n");
+		printf("Enter the operation in the following format [Operation Integer Integer] (for example + 24 45): \n");
 		fgets(str, length, stdin);
 		fflush(stdin);
 
@@ -46,8 +46,8 @@ void insert_string(char* str, int length){
 
 }
 
+//Converting a string into a message for Server
 void convert_message(char* str, struct message* mess){
-
 	char delim[] = " ";
 	char *ptr = strtok(str, delim);
 	char uno[25];
@@ -71,13 +71,19 @@ void convert_message(char* str, struct message* mess){
 
 }
 
+//Function to construct a connection closure message
 void close_message(struct message* mess){
-
 	mess->operation = '=';
 	mess->first = 0;
 	mess->second = 0;
 	mess->result = 0;
 	mess->error = 0;
+}
+
+void print_result(struct message* mess){
+	if(mess->error == 0)
+		printf("The result is: %.2f\n", mess->result);
+	else printf("The result is: error\n");
 }
 
 void errorhandler(char *error_message) {
@@ -105,12 +111,21 @@ int main(int argc, char* argv[]) {
 	char* serverAddress;
 	int serverPort;
 
+	//If the argv vector contains parameters then we do not use the default values..
 	if(argc > 1){
-		strcpy(serverAddress, argv[1]);
-		serverPort = atoi(argv[2]);
+		if(argc == 2){
+			strcpy(serverAddress, argv[1]);
+			serverPort = PROTOPORT;
+		}
+		else if(argc == 3){
+			strcpy(serverAddress, argv[1]);
+			serverPort = atoi(argv[2]);
+		}
+
 	}
 	else
 	{
+		//otherwise we use the default values
 		strcpy(serverAddress, "127.0.0.1");
 		serverPort = PROTOPORT;
 	}
@@ -181,9 +196,7 @@ int main(int argc, char* argv[]) {
 		}
 
 		//Checking if result contains error...
-		if(mess.error == 0)
-			printf("The result is: %.2f\n", mess.result);
-		else printf("The result is: error\n");
+		print_result(&mess);
 	}
 
 	closesocket(c_socket);

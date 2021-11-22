@@ -44,6 +44,7 @@ float division(int first, int second){
 	return ((float)first/(float)second);
 }
 
+//Function that performs the operation requested by the user
 void operation(struct message* mess){
 	if(mess->operation == '+'){
 		mess->result = add(mess->first, mess->second);
@@ -55,7 +56,6 @@ void operation(struct message* mess){
 		mess->result = mult(mess->first, mess->second);
 	}
 
-	//Non restituisce un float
 	if(mess->operation == '/') {
 		if(mess->second == 0)
 		{
@@ -120,7 +120,7 @@ int main() {
 		client_len = sizeof(cad); // set the size of the client address
 		if ((client_socket = accept(my_socket, (struct sockaddr*)&cad, &client_len)) < 0) {
 			errorhandler("accept() failed.\n");
-			// CHIUSURA DELLA CONNESSIONE
+			//Closure of connection
 			closesocket(client_socket);
 			clearwinsock();
 			return 0;
@@ -163,7 +163,7 @@ int main() {
 		}
 
 		closesocket(client_socket);
-		printf("Connection closed.\n");
+		printf("Connection closed.\n\n");
 	} // end-while
 	return(0);
 } // end-main
