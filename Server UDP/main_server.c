@@ -15,8 +15,7 @@
 #endif
 #include <stdio.h>
 #include <string.h> /* for memset() */
-#define ECHOMAX 255
-#define PORT 48000
+#include "protocol.h"
 
 struct message{
 	char operation;
@@ -48,7 +47,6 @@ void convert_message(char* str, struct message* mess){
 	mess->second = atoi(tre);
 	mess->result = 0;
 	mess->error = 0;
-
 }
 
 int mult(int first, int second){
@@ -88,14 +86,34 @@ void operation(struct message* mess){
 		}
 		else  mess->result = division(mess->first, mess->second);
 	}
-
 }
 
 void result_to_string(char* stringRcvd, struct message* mess){
 	char result[25];
+	char uno[25];
+	char due[25];
+	char oper[25];
+	char finalString[50];
+
+	sprintf(uno, "%d", mess->first);
+	sprintf(due, "%d", mess->second);
+	oper[0] = mess->operation;
+	oper[1] = '\0';
 	sprintf(result, "%g", mess->result);
-	strcat(stringRcvd, " = ");
-	strcat(stringRcvd, result);
+
+	finalString[0] = '\0';
+	strcat(finalString, uno);
+	strcat(finalString, " ");
+	strcat(finalString, oper);
+	strcat(finalString, " ");
+	strcat(finalString, due);
+	strcat(finalString, " = ");
+
+	if(mess->error == 1)
+		strcat(finalString, "error");
+	else strcat(finalString, result);
+
+	strcpy(stringRcvd, finalString);
 }
 
 void ErrorHandler(char *errorMessage) {
@@ -125,41 +143,73 @@ int main() {
 	char echoBuffer[ECHOMAX];
 	int recvMsgSize;
 
-	// CREAZIONE DELLA SOCKET
-	if ((sock = socket(PF_INET, SOCK_DGRAM, IPPROTO_UDP)) < 0)
+	//Creating the socket
+	if ((sock = socket(PF_INET, SOCK_DGRAM, IPPROTO_UDP)) < 0){
 		ErrorHandler("socket() failed");
+		closesocket(sock);
+		ClearWinSock();
+		system("pause");
+		return -1;
+	}
 
-	// COSTRUZIONE DELL'INDIRIZZO DEL SERVER
+	//Creating the Server Address
 	memset(&echoServAddr, 0, sizeof(echoServAddr));
 	echoServAddr.sin_family = AF_INET;
 	echoServAddr.sin_port = htons(PORT);
-	echoServAddr.sin_addr.s_addr = inet_addr("127.0.0.1");
+	echoServAddr.sin_addr.s_addr = inet_addr(IP);
 
-	// BIND DELLA SOCKET
-	if ((bind(sock, (struct sockaddr *)&echoServAddr, sizeof(echoServAddr))) < 0)
+	//Binding of socket
+	if ((bind(sock, (struct sockaddr *)&echoServAddr, sizeof(echoServAddr))) < 0){
 		ErrorHandler("bind() failed");
+		closesocket(sock);
+		ClearWinSock();
+		system("pause");
+		return -1;
+	}
 
-	// RICEZIONE DELLA STRINGA ECHO DAL CLIENT
+	printf("UDP Server is available...\n");
+	//Receiving the string from Client
 	while(1) {
 		cliAddrLen = sizeof(echoClntAddr);
 		recvMsgSize = recvfrom(sock, echoBuffer, ECHOMAX, 0, (struct sockaddr*)&echoClntAddr, &cliAddrLen);
+		if (recvMsgSize <= 0) {
+			ErrorHandler("recvfrom server failed.\n");
+			closesocket(sock);
+			ClearWinSock();
+			system("pause");
+			return -1;
+		}
 		echoBuffer[recvMsgSize-1] = '\0';
-		printf("Richiesta operazione %s dal client %s, ip %s\n", echoBuffer, "non so", inet_ntoa(echoClntAddr.sin_addr));
+
+		//Retrive client information and print his request
+		struct hostent* clientIP;
+		clientIP = gethostbyaddr((char*) &echoClntAddr.sin_addr.s_addr, 4, AF_INET); //retrive canonic client name
+		struct in_addr* IP_A = (struct in_addr*) clientIP->h_addr_list[0];
+		printf("Request operation '%s' from client %s, ip %s\n", echoBuffer, clientIP->h_name, inet_ntoa(*IP_A));
 
 		char stringCopy[25];
 		strcpy(stringCopy, echoBuffer);
 		stringCopy[recvMsgSize-1] = '\0';
 
+		//Processing the request
 		struct message msg;
 		convert_message(echoBuffer, &msg);
 		operation(&msg);
 		result_to_string(stringCopy, &msg);
 
-		// RINVIA LA STRINGA ECHO AL CLIENT
-		if (sendto(sock, stringCopy, strlen(stringCopy), 0, (struct sockaddr *)&echoClntAddr, sizeof(echoClntAddr)) != strlen(stringCopy))
+		//Sending result to Client
+		if (sendto(sock, stringCopy, strlen(stringCopy), 0, (struct sockaddr *)&echoClntAddr, sizeof(echoClntAddr)) != strlen(stringCopy)){
 			ErrorHandler("sendto() sent different number of bytes than expected");
+			closesocket(sock);
+			ClearWinSock();
+			system("pause");
+			return -1;
+		}
+		printf("Answer sent.\n\n");
 	}
 
+	closesocket(sock);
+	ClearWinSock();
 	system("pause");
 	return 0;
 }

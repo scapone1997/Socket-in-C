@@ -15,8 +15,7 @@
 #endif
 #include <stdio.h>
 #include <string.h> /* for memset() */
-#define ECHOMAX 255
-#define PORT 48000
+#include "protocol.h"
 
 //Asking user to insert a string
 int insert_string(char* str, int length){
@@ -65,18 +64,16 @@ int main(int argc, char* argv[]) {
 	#endif
 
 	int sock;
-	struct sockaddr_in echoServAddr;
+	struct sockaddr_in echoServAddr;//sad
 	struct sockaddr_in fromAddr;
 	unsigned int fromSize;
 	char echoBuffer[ECHOMAX];
 	int echoStringLen;
 	int respStringLen;
 	char serverAddress[25];
+	char serverName[25];
 	int serverPort;
-
-	// CREAZIONE DELLA SOCKET
-	if ((sock = socket(PF_INET, SOCK_DGRAM, IPPROTO_UDP)) < 0)
-		ErrorHandler("socket() failed");
+	struct hostent *serverHost;
 
 	//If the argv vector contains parameters then we do not use the default values..
 	if(argc > 1){
@@ -91,49 +88,85 @@ int main(int argc, char* argv[]) {
 		strcpy(due, ptr);
 		ptr = strtok(NULL, delim);
 
-		if(strcmp(uno, "localhost") == 0)
-			strcpy(serverAddress, "127.0.0.1");
 		serverPort = atoi(due);
+		strcpy(serverName, uno);
+		serverHost = gethostbyname(serverName);
+		if (serverHost == NULL) {
+			ErrorHandler("gethostbyname() client failed.\n");
+			return -1;
+		} else {
+			struct in_addr *hostAddr = (struct in_addr*) serverHost->h_addr_list[0];
+			strcpy(serverAddress, inet_ntoa(*hostAddr));
+		}
 	}
 	else
 	{
 		//otherwise we use the default values
-		strcpy(serverAddress, "127.0.0.1");
+		strcpy(serverAddress, IP);
+		strcpy(serverName, NAME);
 		serverPort = PORT;
 	}
 
-	// COSTRUZIONE DELL'INDIRIZZO DEL SERVER
+	//Creating the socket
+	if ((sock = socket(PF_INET, SOCK_DGRAM, IPPROTO_UDP)) < 0){
+		ErrorHandler("socket client creation failed.\n");
+		closesocket(sock);
+		ClearWinSock();
+		system("pause");
+		return -1;
+	}
+
+	//Creating the Server address
 	memset(&echoServAddr, 0, sizeof(echoServAddr));
 	echoServAddr.sin_family = PF_INET;
 	echoServAddr.sin_port = htons(serverPort);
 	echoServAddr.sin_addr.s_addr = inet_addr(serverAddress);
 
 	while(1){
-
 		char string[25];
 		int stop = insert_string(string, 25);
-
 		if(stop == 2)
 			break;
 
 		if ((echoStringLen = strlen(string)) > ECHOMAX)
 			ErrorHandler("echo word too long");
 
-		// INVIO DELLA STRINGA ECHO AL SERVER
-		if (sendto(sock, string, echoStringLen, 0, (struct sockaddr*)&echoServAddr, sizeof(echoServAddr)) != echoStringLen)
+		//Sending the message to Server
+		if (sendto(sock, string, echoStringLen, 0, (struct sockaddr*)&echoServAddr, sizeof(echoServAddr)) != echoStringLen){
 			ErrorHandler("sendto() sent different number of bytes than expected");
+			closesocket(sock);
+			ClearWinSock();
+			system("pause");
+			return -1;
+		}
 
-		// RITORNO DELLA STRINGA ECHO
+
+		//Reading the response received from the server
 		fromSize = sizeof(fromAddr);
 		respStringLen = recvfrom(sock, echoBuffer, ECHOMAX, 0, (struct sockaddr*)&fromAddr, &fromSize);
 		echoBuffer[respStringLen] = '\0';
-		printf("Ricevuto risultato dal server %s ip %s: %s\n", "localhost", "127.0.0.1", echoBuffer);
+		if (respStringLen <= 0) {
+			ErrorHandler("recvfrom newString failed.\n");
+			closesocket(sock);
+			ClearWinSock();
+			system("pause");
+			return -1;
+		}
+
+		//Retrive canonic server name
+		/*
+		struct hostent* serverIP;
+		serverIP = gethostbyaddr((char*) &echoServAddr.sin_addr.s_addr, 4, AF_INET);
+		struct in_addr* IP_A = (struct in_addr*) serverIP->h_addr_list[0];
+		*/
 
 		if (echoServAddr.sin_addr.s_addr != fromAddr.sin_addr.s_addr){
 			fprintf(stderr, "Error: received a packet from unknown source.\n");
+			closesocket(sock);
+			ClearWinSock();
 			exit(EXIT_FAILURE);
 		}
-
+		printf("Result from server %s, ip %s: %s\n\n", serverName, serverAddress, echoBuffer);
 	}
 
 	closesocket(sock);
